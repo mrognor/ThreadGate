@@ -1,5 +1,7 @@
 #include <thread>
 #include <condition_variable>
+#include <chrono>
+#include <iostream>
 
 // This class implements a gate for a thread. It works as condition variable, 
 // but if the Open method was called in another thread before the Close method, 
@@ -23,6 +25,50 @@ public:
             condVarMutex.lock();
             mtx.unlock();
             cv.wait(lk);
+            condVarMutex.unlock();
+            mtx.lock();
+        }
+        else
+        {
+            IsActivated = true;
+        }
+        mtx.unlock();
+    }
+
+    // Blocks the execution of the thread until the Open method is called or time's not up.
+    // If the Run method was called before this method, then the thread is not blocked.
+    // The Close and Open methods are synchronized with each other using a mutex
+    template<class T>
+    void CloseFor(std::chrono::duration<T> duration)
+    {
+        mtx.lock();
+        if (IsActivated)
+        {
+            condVarMutex.lock();
+            mtx.unlock();
+            cv.wait_for(lk, duration);
+            condVarMutex.unlock();
+            mtx.lock();
+        }
+        else
+        {
+            IsActivated = true;
+        }
+        mtx.unlock();
+    }
+
+    // Blocks the execution of the thread until the Open method is called or the time has come for.
+    // If the Run method was called before this method, then the thread is not blocked.
+    // The Close and Open methods are synchronized with each other using a mutex
+    template<class T>
+    void CloseUntil(std::chrono::time_point<T> timePoint)
+    {
+        mtx.lock();
+        if (IsActivated)
+        {
+            condVarMutex.lock();
+            mtx.unlock();
+            cv.wait_until(lk, timePoint);
             condVarMutex.unlock();
             mtx.lock();
         }
@@ -86,6 +132,44 @@ public:
         mtx.unlock();
     }
 
+    // Blocks the execution of the thread until the Open method is called or time's not up.
+    // If the Run method was called before this method, then the thread is not blocked.
+    // The Close and Open methods are synchronized with each other using a mutex
+    template<class T>
+    void CloseFor(std::chrono::duration<T> duration)
+    {
+        mtx.lock();
+        if (ClosingAmount <= 0)
+        {
+            condVarMutex.lock();
+            mtx.unlock();
+            cv.wait_for(lk, duration);
+            condVarMutex.unlock();
+            mtx.lock();
+        }
+        --ClosingAmount;
+        mtx.unlock();
+    }
+
+    // Blocks the execution of the thread until the Open method is called or the time has come for.
+    // If the Run method was called before this method, then the thread is not blocked.
+    // The Close and Open methods are synchronized with each other using a mutex
+    template<class T>
+    void CloseUntil(std::chrono::time_point<T> timePoint)
+    {
+        mtx.lock();
+        if (ClosingAmount <= 0)
+        {
+            condVarMutex.lock();
+            mtx.unlock();
+            cv.wait_until(lk, timePoint);
+            condVarMutex.unlock();
+            mtx.lock();
+        }
+        --ClosingAmount;
+        mtx.unlock();
+    }
+
     // Causes the thread to continue executing after the Close method. 
     // If called before the Sleep method, then the Sleep method will not block the thread.
     // The Close and Open methods are synchronized with each other using a mutex
@@ -128,6 +212,8 @@ int main()
 
     th2.join();
 
+    std::cout << "Regular gates" << std::endl;
+
     RecursiveGate rg;
     
     std::thread th3([&]()
@@ -139,4 +225,22 @@ int main()
     rg.Open();
 
     th3.join();
+
+    std::cout << "Recursive gates" << std::endl;
+    
+    g.CloseFor(std::chrono::seconds(4));
+
+    std::cout << "Regular time gate for" << std::endl;
+
+    rg.CloseFor(std::chrono::seconds(4));
+
+    std::cout << "Recursive time gate for" << std::endl;
+    
+    auto now = std::chrono::system_clock::now();
+
+    g.CloseUntil(now + std::chrono::seconds(5));
+    std::cout << "Regular time gate until" << std::endl;
+    
+    rg.CloseUntil(now + std::chrono::seconds(5));
+    std::cout << "Recursive time gate until" << std::endl;  
 }
