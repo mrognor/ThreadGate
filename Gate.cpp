@@ -10,7 +10,6 @@ class Gate
 {
 private:
     std::mutex mtx, condVarMutex, lockMutex;
-    std::unique_lock<std::mutex> lk = std::unique_lock<std::mutex>(lockMutex);
     std::condition_variable cv;
     bool IsActivated = true;
 public:
@@ -19,6 +18,7 @@ public:
     // The Close and Open methods are synchronized with each other using a mutex
     void Close()
     {
+        std::unique_lock<std::mutex> lk(lockMutex);
         mtx.lock();
         if (IsActivated)
         {
@@ -66,7 +66,6 @@ class RecursiveGate
 {
 private:
     std::mutex mtx, condVarMutex, lockMutex;
-    std::unique_lock<std::mutex> lk = std::unique_lock<std::mutex>(lockMutex);
     std::condition_variable cv;
     int ClosingAmount = 0;
 public:
@@ -75,6 +74,7 @@ public:
     // The Close and Open methods are synchronized with each other using a mutex
     void Close()
     {
+        std::unique_lock<std::mutex> lk(lockMutex);
         mtx.lock();
         if (ClosingAmount <= 0)
         {
@@ -116,7 +116,6 @@ class TimeGate
 {
 private:
     std::mutex mtx, condVarMutex, lockMutex;
-    std::unique_lock<std::mutex> lk = std::unique_lock<std::mutex>(lockMutex);
     std::condition_variable cv;
     bool IsActivated = true;
 public:
@@ -125,6 +124,7 @@ public:
     // The Close and Open methods are synchronized with each other using a mutex
     void Close()
     {
+        std::unique_lock<std::mutex> lk(lockMutex);
         mtx.lock();
         if (IsActivated)
         {
@@ -148,6 +148,7 @@ public:
     template<class T>
     void CloseFor(std::chrono::duration<T> duration)
     {
+        std::unique_lock<std::mutex> lk(lockMutex);
         mtx.lock();
         if (IsActivated)
         {
@@ -171,6 +172,7 @@ public:
     template<class T>
     void CloseUntil(std::chrono::time_point<T> timePoint)
     {
+        std::unique_lock<std::mutex> lk(lockMutex);
         mtx.lock();
         if (IsActivated)
         {
